@@ -173,7 +173,6 @@ def sub_getdatefromcurrentband(netcdffile, dateband):
 
     return dimension_date, dimension_value
 
-
 def exportbands(timeband,
                 inputproperties,
                 inputfilepath,
@@ -197,14 +196,14 @@ def exportbands(timeband,
     filemonth, fileday, fileyear = sub_processdatesfromnetcdf(dimension_date)
 
     # Make filename from year, month, and day:
-    arguments = [noaafile_type, fileyear, filemonth, fileday]
+    arguments = [noaafile_type, fileyear, filemonth, fileday]    
     outputrastername = '_'.join(map(str, arguments))
     print('Exporting raster {}.tif'.format(outputrastername))
 
     # Take CURRENT dimensions from current NetCDF.
     # Pull current layer out as raster layer in memory named 'outfilename'.
     # rainfall (PRATE) is the value that will be mapped.
-    arcpy.env.extent = arcpy.Extent(0, -90.05477905273438, 360, 88.07022094726563)
+
     makenetcdf = arcpy.MakeNetCDFRasterLayer_md(inputfilepath,
                                                 "prate",
                                                 "lon",
@@ -216,37 +215,27 @@ def exportbands(timeband,
 
     # Convert in-memory raster layer to a saved layer, also named 'outfilename'.
     outputrasterfile = os.path.join(outputpath, ''.join([outputrastername, '.tif']))
-    outputrasterfileclp = os.path.join(outputpath, ''.join([outputrastername, 'clp', '.tif']))
-    arcpy.AddMessage("Writing " + outputrastername)
-   
     
-    copyraster = arcpy.CopyRaster_management("temporaryraster",
-                                             outputrasterfile,
-                                             "",
-                                             "")
-    in_raster = outputrasterfile
-    arcpy.env.extent = arcpy.Extent(-180, -90.05477905273438, 180, 88.07022094726563)
-    filled = arcpy.sa.Con(arcpy.sa.IsNull(in_raster),arcpy.sa.FocalStatistics(in_raster,
-                        arcpy.sa.NbrRectangle(2, 2),'MEAN'), in_raster)
-    filled.save(outputrasterfileclp)
-##    arcpy.Clip_management(outputrasterfile, "-80 -90 180 90", outputrasterfileclp,
-##                          "", "","NONE", "NO_MAINTAIN_EXTENT")
-    ##==================================
-    ##Mosaic
-    ##Usage: Mosaic_management inputs;inputs... target {LAST | FIRST | BLEND | MEAN | MINIMUM | MAXIMUM} {FIRST | REJECT | LAST | MATCH} 
-    ##                         {background_value} {nodata_value} {NONE | OneBitTo8Bit} {mosaicking_tolerance}  
-    ##                         {NONE | STATISTIC_MATCHING | HISTOGRAM_MATCHING 
-    ##                         | LINEARCORRELATION_MATCHING}
-    arcpy.Mosaic_management(outputrasterfileclp,outputrasterfile,
-                            "LAST","LAST","0", "9", "", "", "")
+    arcpy.AddMessage("Writing " + outputrastername)
 
-    # Print errors and delete objects from ArcPy environment,
-    # ... emptying the temporary memory of the environment.
-    print copyraster.getMessages()
+    # Resample raster such that resultant raster has half the X and Y dimensions
+    # This will make each raster having second column perfectly aligned by prime meridian
+    arcpy.Resample_management("temporaryraster", outputrasterfile, "0.9375 0.94747340425532",
+                              "NEAREST")
+
+    # Clip first column of each raster (the only column that lies in -X dimension)
+    arcpy.Clip_management(outputrasterfile, "-0.9375 -90.054779 0 88.070221",
+                          "clip", "", "","NONE", "NO_MAINTAIN_EXTENT")
+
+    # Mosaic the first column of each raster to the original raster
+    # ArcGIS will automatically take care of converting -ve X values to +ve
+    arcpy.Mosaic_management("clip",outputrasterfile,
+                            "LAST","LAST","0", "9", "", "", "")
+    
     print makenetcdf.getMessages()
     arcpy.Delete_management(outputrastername)
     arcpy.Delete_management("in_memory")
-    arcpy.Delete_management(outputrasterfileclp)
+##    arcpy.Delete_management(outputrasterfileclp)
 
 def loopovernetcdfbands(toptimeband,
                         inputproperties,
@@ -299,14 +288,6 @@ def main():
     if not os.path.isdir(outputpath + "/"):
         os.mkdir(outputpath + "/")
     
-    '''
-    ## A - HEADER: Define global variables for project.
-    workingpath = os.path.join('c:' + os.sep, 'Users', '!!!YOUR-PATH!!!')
-    arcgisenvironmentpath = os.path.join(workingpath, 'Documents', 'ArcGIS')
-    projectpath = os.path.join(workingpath, '!!!YOUR-PROJECT!!!')
-    inputpath = os.path.join(projectpath, '!!!INPUT-FOLDER!!!')
-    outputpath = os.path.join(projectpath, 'output')
-    '''
 
     ## B - SETUP ArcPy: Setup the API for ArcGis in Python (ArcPy)
     setup_arcpyenvironment()
@@ -320,22 +301,7 @@ def main():
     # PRATE is short of precipitation rate.
     global noaafile_type
     noaafile_type = "prate"
-    '''
-    #Loop through input folder and search all prate files
-    root = inputpath
-    pattern = "prate.*.nc"
-    nc = []
 
-    for path, subdirs, files in os.walk(root):
-        for name in files:
-            if fnmatch(name, pattern):
-                inputfilepath = os.path.join(path, name)
-                nc.append(inputfilepath)
-    arcpy.AddMessage(nc)
-
-    for inputfile in nc:
-        nsplitinputfile
-    '''    
     # Start and end year:
     # The years for the 3 sample input files
     startyear = arcpy.GetParameterAsText(1)
