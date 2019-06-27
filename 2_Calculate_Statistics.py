@@ -1,7 +1,7 @@
 # Import Requried Libraries
 import arcpy
 from arcpy.sa import *
-import os, sys, string
+import os, sys, string, gc
 from fnmatch import fnmatch
 
 # Get user defined variables from ArcGIS tool GUI
@@ -77,31 +77,17 @@ for path, subdirs, files in os.walk(root):
     for name in files:
         if fnmatch(name, pattern):
             TIF = os.path.join(path, name)
-            lTIFs.append(TIF)            
+            lTIFs.append(TIF)
+            
+fc_count = len(lTIFs)
             
 # Loop through each raster file and calculate statistics
 for tif in lTIFs:
     tifpath, tifname = os.path.split(tif)       # Split filenames and paths
-
-    ###################################################################
-    ## Definition of variables related to Point Shapefile Processing ##
-    ###################################################################
     
-    ptout = tif.replace('.tif', '.shp')         # Full name & Path of temp output point shp
-    ptcsv = tifname.replace('.tif', '_pt.csv')  # Define output csv file (add _pt after filename)
-    ptcsv = ptcsv.replace('prate_', '')         # Finalize CSV name by stripping "prate_"
-    tbloutfield = ptcsv.split('.')[0]           # Get output csv filname without extension
-    tbloutfield = tbloutfield.replace('_pt', '')# Strip _pt from name
-    tbloutfield = "d"+tbloutfield[1:]           # Replace first char of date(year) by "d" to overrule a restriction
-
-    #####################################################################
-    ## Definition of variables related to Polygon Shapefile Processing ##
-    #####################################################################
-
-    pgcsv = ptcsv.replace('_pt.csv', '_pg.csv')
-    pgdbf = ptcsv.replace('_pt.csv', '_pg.dbf')
-    pgcsvp = os.path.join(tifpath, pgcsv)
-    inTables = []
+    # Set the Progressor
+    arcpy.SetProgressor("step", "Processing Tiff Files ...",
+                        0, fc_count,1)
 
     ##############################################################
     ## Start process to calulate statistics for point shapefile ##
@@ -109,18 +95,35 @@ for tif in lTIFs:
     
     if ptshp:
 
+        ###################################################################
+        ## Definition of variables related to Point Shapefile Processing ##
+        ###################################################################
+        
+        ptout = tif.replace('.tif', '.shp')         # Full name & Path of temp output point shp
+        ptcsv = tifname.replace('.tif', '_pt.csv')  # Define output csv file (add _pt after filename)
+        ptcsv = ptcsv.replace('prate_', '')         # Finalize CSV name by stripping "prate_"
+        tbloutfield = ptcsv.split('.')[0]           # Get output csv filname without extension
+        tbloutfield = tbloutfield.replace('_pt', '')# Strip _pt from name
+        tbloutfield = "d"+tbloutfield[1:]           # Replace first char of date(year) by "d" to overrule a restriction
+
+        # Start Process
+
+        # Update the progressor label for current tif file
+        arcpy.SetProgressorLabel("Processing {0}...".format(tifname))
+
         # Delete temporary point shapefile if already exists
         if os.path.exists(ptout):
             arcpy.Delete_management(ptout)
 
         # Compute statistics only if output CSV file doesn't exist
         if not os.path.exists(os.path.join(tifpath, ptcsv)):
+     
             arcpy.AddMessage('Calculating point statistics for ' + tifname)
             arcpy.sa.ExtractValuesToPoints(ptshp, tif, ptout,
                               ptinterval, "VALUE_ONLY")
 
             # Delete unnecessary fields and rename the statistics field to date
-            arcpy.AddMessage("  Dropping and renaming fields")
+##            arcpy.AddMessage("  Dropping and renaming fields")
             fieldList = arcpy.ListFields(ptout)  #get a list of temp point shp fields 
             for field in fieldList: #loop through each field
                 if field.name == 'RASTERVALU':  #look for the name RASTERVALU                    
@@ -135,18 +138,37 @@ for tif in lTIFs:
                             arcpy.AddMessage("Error Deleting Field " + field.name)
 
             # Convert shapefile to CSV
-            arcpy.AddMessage("  Writing " + ptcsv)
+##            arcpy.AddMessage("  Writing " + ptcsv)
             arcpy.TableToTable_conversion(ptout, tifpath, ptcsv)
-            arcpy.Delete_management(ptout)            
+            arcpy.Delete_management(ptout)
+            
         else:
             arcpy.AddMessage('Output already exists. Skipping ' + tifname)
+
+        # Update the Progressor position
+        arcpy.SetProgressorPosition()
+        
         del ptcsv
+        del ptout
+        del tbloutfield
+        gc.collect()
         
     ################################################################
     ## Start process to calulate statistics for polygon shapefile ##
     ################################################################
         
     if pgshp:
+
+        #####################################################################
+        ## Definition of variables related to Polygon Shapefile Processing ##
+        #####################################################################
+
+        pgcsv = ptcsv.replace('_pt.csv', '_pg.csv')
+        pgdbf = ptcsv.replace('_pt.csv', '_pg.dbf')
+        pgcsvp = os.path.join(tifpath, pgcsv)
+        inTables = []
+
+        # Start Process
 
         arcpy.AddMessage('Processing ' + tifname)
         try:
@@ -184,9 +206,10 @@ for tif in lTIFs:
         arcpy.TableToTable_conversion(pgdbf, root, pgcsv)
         arcpy.Delete_management(pgdbf)
         arcpy.Delete_management("tempras")
+        gc.collect()
         for tbl in inTables:
             arcpy.Delete_management(tbl)
     
-
+    arcpy.ResetProgressor()
        
 
