@@ -35,6 +35,8 @@ for path, subdirs, files in os.walk(root):
         if fnmatch(mydir, dpattern):
             mydirpath = os.path.join(path, mydir)
             mydirs.append(mydirpath)
+    if len(mydirs) == 0:
+        mydirs = root
 # Delete empty shapefiles so that they may be generated anew
     for name in files:        
         if fnmatch(name, spattern):
@@ -46,7 +48,8 @@ for path, subdirs, files in os.walk(root):
 # Prepare a list of geotiff files matching the defined pattern from input folder
 for mydir in mydirs:
     for path, subdirs, files in os.walk(mydir):
-        arcpy.AddMessage("\n" + 'Processing Folder ' + mydir + "\n")
+        if len(mydirs)>1:
+            arcpy.AddMessage("\n" + 'Processing Folder ' + mydir + "\n")
         for name in files:
             if fnmatch(name, pattern):
                 TIF = os.path.join(path, name)
