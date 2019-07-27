@@ -26,7 +26,6 @@ arcpy.env.overwriteOutput = True
 pattern = "prate_*.tif"                 # Pattern that will be used to find & prepare a list of raster files
 spattern = "prate_*.shp"                # Pattern that will be used to find & prepare a list of shapefiles
 dpattern = "prate.*"                    # Pattern that will be used to find & prepare a list of input folders
-lTIFs = []                              # Create a blank list that would be populated by input geotiff files later
 mydirs = []                             # Create a blank list that would be populated by input folders later
 
 # Create a list of child folders in the root folder containing GeoTiff Files
@@ -35,8 +34,6 @@ for path, subdirs, files in os.walk(root):
         if fnmatch(mydir, dpattern):
             mydirpath = os.path.join(path, mydir)
             mydirs.append(mydirpath)
-    if len(mydirs) == 0:
-        mydirs = root
 # Delete empty shapefiles so that they may be generated anew
     for name in files:        
         if fnmatch(name, spattern):
@@ -45,11 +42,11 @@ for path, subdirs, files in os.walk(root):
                 arcpy.AddMessage('Deleting empty shapefiles if any') 
                 arcpy.Delete_management(SHP)
 
-# Prepare a list of geotiff files matching the defined pattern from input folder
-for mydir in mydirs:
+# define function to calculate stats from files in a given folder
+def calcstats(mydir):
+    lTIFs = []                              # Create a blank list that would be populated by input geotiff files later
     for path, subdirs, files in os.walk(mydir):
-        if len(mydirs)>1:
-            arcpy.AddMessage("\n" + 'Processing Folder ' + mydir + "\n")
+        arcpy.AddMessage("\n" + 'Processing Folder ' + mydir + "\n")
         for name in files:
             if fnmatch(name, pattern):
                 TIF = os.path.join(path, name)
@@ -83,6 +80,13 @@ for mydir in mydirs:
             del ptout
             del tif
         lTIFs = []
+
+# Prepare a list of geotiff files matching the defined pattern from input folder
+if len(mydirs) > 0:
+    for mydir in mydirs:
+        calcstats(mydir)
+else:
+    caclstats(root)
             
         
 
