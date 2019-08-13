@@ -11,6 +11,8 @@ Toolbox 2a - Bulk extracts raster values to points. ~ 30 hour per 25 years of da
 
 Toolbox 2b - Bulk Exports shapes to CSVs. ~ 30 hour per 25 years of daily data.
 
-Toolbox 3 - Bulk extracts values to shapes.
+Toolbox 3 - Combines CSVs into common file.
 
-Toolbox 4 - Combines CSVs into common file.
+## Note
+
+Removed an intermediary step for after 2a/2b. After using the Extract Raster Value to Table function, this simplified the process.
